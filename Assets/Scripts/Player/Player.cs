@@ -130,11 +130,16 @@ public class Player : MonoBehaviour
     void OnControllerColliderHit(ControllerColliderHit hit)
     {
         Rigidbody rb = hit.collider.attachedRigidbody;
+        PhysicsObject physicsObj = rb != null ? rb.GetComponent<PhysicsObject>() : null;
+        if (physicsObj != null && physicsObj.IsHeld)
+        {
+            // Don't kick held objects
+            return;
+        }
 
         if (rb != null && !rb.isKinematic)
         {
             Vector3 pushDir = new Vector3(hit.moveDirection.x, 0, hit.moveDirection.z);
-
             rb.AddForce(pushDir * 0.15f, ForceMode.Impulse);
         }
     }

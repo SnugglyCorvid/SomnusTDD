@@ -14,6 +14,9 @@ public class PlayerInteractor : MonoBehaviour
     private IInteractable currentTarget;
     private IInteractable heldTarget;
     private Transform currentTransform;
+    private Vector3 worldGrabOffset;
+    private Vector3 grabbedWorldPoint;
+    private Vector2 lastMousePosition;
 
     public GameObject interactPrompt;
     public TextMeshProUGUI interactText;
@@ -21,6 +24,7 @@ public class PlayerInteractor : MonoBehaviour
 
     private bool isHolding = false;
     private bool isPressed = false;
+    private bool isDragging = false;
     private float holdTimer = 0f;
 
     void Awake()
@@ -63,9 +67,15 @@ public class PlayerInteractor : MonoBehaviour
                     currentTransform = hit.collider.transform;
                 }
 
-                if (isHolding && heldTarget == null &&(currentTarget.interactionType == InteractionType.HoldOnly || currentTarget.interactionType == InteractionType.Both))
+                if (isHolding && heldTarget == null && (currentTarget.interactionType == InteractionType.HoldOnly || currentTarget.interactionType == InteractionType.Both))
                 {
                     heldTarget = currentTarget;
+                    grabbedWorldPoint = hit.point;
+                    if (heldTarget is PhysicsObject physicsObject)
+                    {
+                        physicsObject.SetGrabbedOffset(grabbedWorldPoint);
+                        physicsObject.holdDistance = Vector3.Distance(playerCamera.transform.position, grabbedWorldPoint);
+                    }
                 }
             }
         }
@@ -91,8 +101,29 @@ public class PlayerInteractor : MonoBehaviour
 
         if (isHolding && heldTarget != null)
         {
-            heldTarget.OnHold(playerCamera.transform.position + playerCamera.transform.forward * interactDistance, playerCamera.transform.forward, mousePosition);
+            isDragging = (mousePosition - lastMousePosition).magnitude > 0.01f;
+            if (isDragging)
+            {
+                Ray mouseRay = playerCamera.ScreenPointToRay(mousePosition);
+                Vector3 desiredGrabPoint = mouseRay.GetPoint(Vector3.Distance(playerCamera.transform.position, grabbedWorldPoint));
+                heldTarget.OnHold(desiredGrabPoint, playerCamera.transform.forward, mousePosition);
+            }
         }
+
+        if (heldTarget is PhysicsObject physicsObj && isHolding)
+        {
+            float scroll = Mouse.current.scroll.ReadValue().y;
+            if (Mathf.Abs(scroll) > 0.01f)
+            {
+                physicsObj.holdDistance = Mathf.Clamp(
+                    physicsObj.holdDistance + scroll * 0.05f,
+                    0.2f,
+                    3.0f 
+                );
+            }
+        }
+
+        lastMousePosition = mousePosition;
     }
 
     private void OnInteractStarted(InputAction.CallbackContext context)
